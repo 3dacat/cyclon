@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Cyclone (ver2.0)r</title>
+<title>Pixel Bomber</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -31,6 +31,7 @@
   }
   #ui span { color: #ffd166; }
   #ui .hp { color: #ff5252; }
+  #ui .rockets { color: #ff8844; }
   #ui button {
     background: #1e2a44;
     color: #cfe6ff;
@@ -67,7 +68,7 @@
     border: 2px solid #3a5a94;
     padding: 6px;
     z-index: 30;
-    min-width: 220px;
+    min-width: 320px;
     max-height: 60vh;
     overflow-y: auto;
     box-shadow: 0 4px 24px rgba(0,0,0,0.5);
@@ -134,7 +135,7 @@
     font-size: 12px;
     line-height: 1.6;
     color: #cfe6ff;
-    max-width: 400px;
+    max-width: 420px;
     z-index: 9;
     display: none;
     box-shadow: 0 0 24px rgba(60,120,255,0.35);
@@ -208,7 +209,7 @@
     background: linear-gradient(180deg, #16213e, #0f172a);
     border: 3px solid #3a5a94;
     padding: 18px 20px;
-    max-width: 1200px;
+    max-width: 1400px;
     width: 100%;
     max-height: 95vh;
     overflow: auto;
@@ -236,7 +237,7 @@
   }
   .planes {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 10px;
   }
   @media (max-width: 1200px) { .planes { grid-template-columns: repeat(3, 1fr); } }
@@ -310,6 +311,7 @@
   <div>Всего: <span id="total-destroyed">0</span></div>
   <div>Жизни: <span class="hp" id="lives">❤❤❤</span></div>
   <div>Оружие: <span id="weapon">Бомбы</span></div>
+  <div id="rocket-counter" style="display:none;">Ракет осталось: <span class="rockets" id="rockets-left">0</span></div>
   <div id="maps-menu">
     <button id="maps-toggle">Карта: <span id="current-map">Склады</span> ▾</button>
     <div id="maps-list">
@@ -317,13 +319,18 @@
       <button data-map="mountains">Горы</button>
       <button data-map="port">Порт</button>
       <button data-map="bridge">Мост</button>
+      <button data-map="bridge_adv">Улучш. Мост</button>
       <button data-map="volcano">Вулкан</button>
       <button data-map="base">База</button>
+      <button data-map="base_adv">Улучш. База</button>
       <button data-map="fortress">Крепость</button>
       <button data-map="forest">Лес</button>
       <button data-map="cave">Пещера</button>
       <button data-map="advfortress">Улучш. Крепость</button>
       <button data-map="desert">Пустыня</button>
+      <button data-map="desert_adv">Улучш. Пустыня</button>
+      <button data-map="glacier">Ледник</button>
+      <button data-map="labyrinth">Лабиринт</button>
     </div>
   </div>
   <button id="btn-hangar">✈ Ангар (H)</button>
@@ -337,9 +344,10 @@
 <button id="help-toggle" title="Управление">?</button>
 <div id="help-panel">
   <h4>УПРАВЛЕНИЕ</h4>
-  <div class="row"><span class="key">← →</span> или <span class="key">A D</span> — движение</div>
+  <div class="row"><span class="key">← →</span> или <span class="key">A D</span> — движение / поворот ракеты</div>
   <div class="row"><span class="key">↑ ↓</span> или <span class="key">W S</span> — высота</div>
   <div class="row"><span class="key">ЛКМ</span> / <span class="key">Пробел</span> — сброс бомбы</div>
+  <div class="row"><span class="key">Пробел</span> — пуск ракеты (ракетный самолёт)</div>
   <div class="row"><span class="key">ПКМ</span> — сменить оружие / навести ракету</div>
   <div class="row"><span class="key">H</span> — ангар</div>
   <div class="divider"></div>
@@ -348,12 +356,14 @@
   <div class="row"><span class="dot" style="background:#6a6a7a"></span>Камень — 3</div>
   <div class="row"><span class="dot" style="background:#b44cff"></span>Сверхпрочный — 6</div>
   <div class="row"><span class="dot" style="background:#00e5ff"></span>Ультрапрочный — 10</div>
+  <div class="row"><span class="dot" style="background:#b0e0f0"></span>Лёд — 2 (скользкий)</div>
   <div class="divider"></div>
   <div class="row">🔴 ПВО-вертикаль — стреляет строго вверх.</div>
   <div class="row">🟠 ПВО-круговое — стреляет в сторону игрока.</div>
   <div class="row">🟢 Танк — 8 HP, патрулирует поверхность, не атакует.</div>
+  <div class="row">🚀 Ракеты — только по ПРОБЕЛУ.</div>
+  <div class="row">❄ На Леднике бомбы скатываются по склонам!</div>
   <div class="row">⚖ Блок падает, если у него <b>меньше 3 опор</b> снизу.</div>
-  <div class="row">🏭 ПВО/танки падают, если под ними нет опоры.</div>
   <div class="row">3 попадания — конец игры.</div>
 </div>
 
@@ -388,6 +398,8 @@
   const totalEl    = document.getElementById('total-destroyed');
   const livesEl    = document.getElementById('lives');
   const weaponEl   = document.getElementById('weapon');
+  const rocketsLeftEl = document.getElementById('rockets-left');
+  const rocketCounterEl = document.getElementById('rocket-counter');
   const hangarTotalEl = document.getElementById('hangar-total');
   const progressHintEl = document.getElementById('progress-hint');
   const overlay    = document.getElementById('overlay');
@@ -402,16 +414,11 @@
   const mapsList   = document.getElementById('maps-list');
   const currentMapEl = document.getElementById('current-map');
 
-  // ---------- ПАУЗА ----------
   let paused = false;
-  function setPaused(p) {
-    paused = !!p;
-  }
   function updatePauseState() {
-    // Игра на паузе, если открыт ангар или меню карт
     const hangarOpen = hangarEl.classList.contains('show');
     const mapsOpen = mapsList.classList.contains('show');
-    setPaused(hangarOpen || mapsOpen);
+    paused = hangarOpen || mapsOpen;
   }
 
   function fitCanvas() {
@@ -428,9 +435,13 @@
   helpToggle.addEventListener('click', () => helpPanel.classList.toggle('show'));
 
   const MAP_NAMES = {
-    warehouse: 'Склады', mountains: 'Горы', port: 'Порт', bridge: 'Мост',
-    volcano: 'Вулкан', base: 'База', fortress: 'Крепость', forest: 'Лес',
-    cave: 'Пещера', advfortress: 'Улучш. Крепость', desert: 'Пустыня'
+    warehouse: 'Склады', mountains: 'Горы', port: 'Порт',
+    bridge: 'Мост', bridge_adv: 'Улучш. Мост',
+    volcano: 'Вулкан', base: 'База', base_adv: 'Улучш. База',
+    fortress: 'Крепость', forest: 'Лес', cave: 'Пещера',
+    advfortress: 'Улучш. Крепость',
+    desert: 'Пустыня', desert_adv: 'Улучш. Пустыня',
+    glacier: 'Ледник', labyrinth: 'Лабиринт'
   };
 
   mapsToggle.addEventListener('click', (e) => {
@@ -464,7 +475,7 @@
   }
 
   // ---------- Хранилище ----------
-  const SAVE_KEY = 'pixelbomber_save_v23';
+  const SAVE_KEY = 'pixelbomber_save_v31';
   let storageOk = true;
   try {
     localStorage.setItem('__test__','1');
@@ -473,7 +484,11 @@
 
   let save = {
     totalDestroyed: 0,
-    unlocked: { basic: true, advanced: false, plane: false, advplane: false, airship: false, advairship: false },
+    unlocked: {
+      basic: true, advanced: false, plane: false, advplane: false,
+      airship: false, advairship: false,
+      rocketplane: false, advrocketplane: false
+    },
     selected: 'basic'
   };
 
@@ -485,7 +500,7 @@
         const parsed = JSON.parse(raw);
         save.totalDestroyed = parsed.totalDestroyed || 0;
         save.unlocked = Object.assign(
-          { basic:true, advanced:false, plane:false, advplane:false, airship:false, advairship:false },
+          { basic:true, advanced:false, plane:false, advplane:false, airship:false, advairship:false, rocketplane:false, advrocketplane:false },
           parsed.unlocked || {}
         );
         save.selected = parsed.selected || 'basic';
@@ -557,7 +572,7 @@
     },
     advairship: {
       id: 'advairship', name: 'Улучш. дирижабль',
-      desc: 'Быстрее базового. ПКМ переключает бомбы (обычная / усиленная / тяжёлая) и ракеты. Тяжёлая бомба: радиус 6, урон 6/3.',
+      desc: 'Быстрее базового. ПКМ переключает бомбы (обычная / усиленная / тяжёлая) и ракеты.',
       req: 18000,
       maxVx: 2.50, maxVy: 1.83, accel: 0.25, damping: 0.93,
       cooldownMax: 8,
@@ -569,6 +584,32 @@
       },
       tilt: false, hasRockets: true,
       color1: '#00bcd4', color2: '#006064', color3: '#b2ebf2'
+    },
+    rocketplane: {
+      id: 'rocketplane', name: 'Ракетный самолёт',
+      desc: 'На старте висит и не участвует — игрок управляет 3 ракетами (ПРОБЕЛ — пуск, ← → — поворот). После всех ракет — улучшенный самолёт.',
+      req: 22000,
+      maxVx: 3.67, maxVy: 2.50, accel: 0.417, damping: 0.9,
+      cooldownMax: 8,
+      bombTypes: ['advanced'],
+      bombStats: { advanced: { radius: 4, dmgCenter: 3, dmgEdge: 2, color: '#ff9800' } },
+      tilt: true, hasRockets: false,
+      isRocketPlane: true,
+      rocketPhase: 3,
+      color1: '#7c4dff', color2: '#4527a0', color3: '#b39ddb'
+    },
+    advrocketplane: {
+      id: 'advrocketplane', name: 'Улучш. ракетный самолёт',
+      desc: 'Улучшенная версия: 5 управляемых ракет вместо 3. Остальное идентично.',
+      req: 24800,
+      maxVx: 3.67, maxVy: 2.50, accel: 0.417, damping: 0.9,
+      cooldownMax: 8,
+      bombTypes: ['advanced'],
+      bombStats: { advanced: { radius: 4, dmgCenter: 3, dmgEdge: 2, color: '#ff9800' } },
+      tilt: true, hasRockets: false,
+      isRocketPlane: true,
+      rocketPhase: 5,
+      color1: '#ff4081', color2: '#c2185b', color3: '#ffb3c1'
     }
   };
 
@@ -590,10 +631,17 @@
   let caveCeilings = new Set();
   let treeCrowns = new Set();
   let pyramidCeilings = new Set();
+  let towerCeilings = new Set();
   let pyramidInteriorAASpots = [];
   let pyramidInteriorTankSpots = [];
   let fortressInteriorAASpots = [];
   let fortressInteriorTankSpots = [];
+  let towerInteriorAASpots = [];
+  let towerInteriorTankSpots = [];
+
+  let rocketPhaseActive = false;
+  let rocketsRemaining = 0;
+  let activeRocket = null;
 
   function keyOf(x, y) { return x * 1000 + y; }
 
@@ -659,6 +707,14 @@
       save.unlocked.advairship = true; changed = true;
       notifyToast('🔓 Разблокирован: Улучшенный дирижабль!');
     }
+    if (!save.unlocked.rocketplane && save.totalDestroyed >= PLANES.rocketplane.req) {
+      save.unlocked.rocketplane = true; changed = true;
+      notifyToast('🔓 Разблокирован: Ракетный самолёт!');
+    }
+    if (!save.unlocked.advrocketplane && save.totalDestroyed >= PLANES.advrocketplane.req) {
+      save.unlocked.advrocketplane = true; changed = true;
+      notifyToast('🔓 Разблокирован: Улучшенный ракетный самолёт!');
+    }
     if (changed) {
       persist();
       if (hangarEl.classList.contains('show')) refreshHangarCards();
@@ -693,8 +749,7 @@
       x, y: baseY, w: width, h: height,
       cx: (x + width/2) * PIXEL,
       cy: (baseY + height/2) * PIXEL,
-      hp: 8,
-      maxHp: 8,
+      hp: 8, maxHp: 8,
       dir: Math.random() < 0.5 ? 1 : -1,
       moveCooldown: 30 + Math.floor(Math.random() * 60),
       turnCooldown: 0,
@@ -704,7 +759,10 @@
     };
   }
 
-  const TANK_MAPS = new Set(['desert', 'forest', 'base', 'bridge', 'fortress', 'advfortress']);
+  const TANK_MAPS = new Set([
+    'desert', 'desert_adv', 'forest', 'base', 'base_adv',
+    'bridge', 'bridge_adv', 'fortress', 'advfortress', 'labyrinth'
+  ]);
 
   function placeTanks() {
     tanks = [];
@@ -712,11 +770,15 @@
 
     const config = {
       desert:      { total: 5 },
+      desert_adv:  { total: 7 },
       forest:      { total: 3 },
       base:        { total: 5 },
+      base_adv:    { total: 8 },
       bridge:      { total: 2 },
+      bridge_adv:  { total: 5 },
       fortress:    { total: 5 },
-      advfortress: { total: 7 }
+      advfortress: { total: 7 },
+      labyrinth:   { total: 25 }
     };
     const cfg = config[sceneType] || { total: 0 };
 
@@ -750,9 +812,9 @@
           interiorPlaced++;
         }
       }
-    } else if (sceneType === 'desert') {
+    } else if (sceneType === 'desert' || sceneType === 'desert_adv') {
       let interiorPlaced = 0;
-      const interiorCount = 3;
+      const interiorCount = sceneType === 'desert_adv' ? 4 : 3;
       for (const room of pyramidInteriorTankSpots) {
         if (interiorPlaced >= interiorCount) break;
         const r = room;
@@ -795,6 +857,56 @@
         if (wide < 5) continue;
         if (tanks.some(t => Math.abs(t.x - x) < 10)) continue;
         if (aaGuns.some(g => Math.abs(g.x - x) < 6)) continue;
+        const t = spawnTank(top, x);
+        if (t) { tanks.push(t); placed++; }
+      }
+    } else if (sceneType === 'labyrinth') {
+      // Сначала внутренние танки в помещениях лабиринта
+      let interiorPlaced = 0;
+      const interiorCount = Math.floor(cfg.total * 0.5);
+      for (const room of towerInteriorTankSpots) {
+        if (interiorPlaced >= interiorCount) break;
+        const r = room;
+        if (r.w < 8 || r.h < 5) continue;
+        const tx = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 7));
+        const ty = r.y + r.h - 3;
+        let free = true;
+        for (let yy = ty; yy < ty + 3; yy++) {
+          for (let xx = tx; xx < tx + 5; xx++) {
+            if (xx < 0 || xx >= COLS || yy < 0 || yy >= ROWS) { free = false; break; }
+            if (grid[yy][xx] !== 0) { free = false; break; }
+          }
+          if (!free) break;
+        }
+        if (!free) continue;
+        const t = spawnTank(ty + 3, tx, {
+          interior: true,
+          allowNearPlayer: true,
+          patrolMinX: r.x + 1,
+          patrolMaxX: r.x + r.w - 6
+        });
+        if (t) {
+          t.y = ty;
+          t.cy = (ty + t.h/2) * PIXEL;
+          tanks.push(t);
+          interiorPlaced++;
+        }
+      }
+      // Остальные на земле вокруг
+      const surfaceCount = cfg.total - interiorPlaced;
+      let attempts = 0;
+      let placed = 0;
+      while (placed < surfaceCount && attempts < 1000) {
+        attempts++;
+        const x = 4 + Math.floor(Math.random() * (COLS - 12));
+        const top = findGroundTopInColumn(x);
+        if (top < 4 || top > ROWS - 8) continue;
+        let wide = 0;
+        for (let dx = -2; dx <= 5; dx++)
+          if (x+dx >= 0 && x+dx < COLS && grid[top][x+dx] > 0) wide++;
+        if (wide < 5) continue;
+        if (tanks.some(t => Math.abs(t.x - x) < 6)) continue;
+        if (aaGuns.some(g => Math.abs(g.x - x) < 4)) continue;
         const t = spawnTank(top, x);
         if (t) { tanks.push(t); placed++; }
       }
@@ -955,13 +1067,18 @@
       mountains:    { total: 5, omni: 2 },
       port:         { total: 5, omni: 3 },
       bridge:       { total: 5, omni: 3 },
+      bridge_adv:   { total: 9, omni: 5 },
       volcano:      { total: 5, omni: 3 },
       base:         { total: 7, omni: 4 },
+      base_adv:     { total: 10, omni: 6 },
       fortress:     { total: 8, omni: 5 },
       forest:       { total: 5, omni: 2 },
       cave:         { total: 4, omni: 2 },
       advfortress:  { total: 10, omni: 6 },
-      desert:       { total: 7, omni: 4 }
+      desert:       { total: 7, omni: 4 },
+      desert_adv:   { total: 10, omni: 6 },
+      glacier:      { total: 6, omni: 3 },
+      labyrinth:    { total: 40, omni: 25 }
     };
     const cfg = config[sceneType] || { total: 4, omni: 2 };
 
@@ -969,6 +1086,31 @@
       placeSimpleAA(cfg, { minTop: 3, maxTop: ROWS - 6, minWide: 3, spacing: 7 });
       for (const spot of fortressInteriorAASpots) {
         const room = spot.room;
+        const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 5));
+        const iy = room.y + room.h - 2;
+        let free = true;
+        for (let yy = iy; yy < iy + 2; yy++) {
+          for (let xx = ix; xx < ix + 3; xx++) {
+            if (xx < 0 || xx >= COLS || yy < 0 || yy >= ROWS) { free = false; break; }
+            if (grid[yy][xx] !== 0) { free = false; break; }
+          }
+          if (!free) break;
+        }
+        if (!free) continue;
+        const gun = spawnAA(iy + 2, ix, spot.type, { interior: true, allowNearPlayer: true });
+        if (gun) {
+          gun.y = iy;
+          gun.cy = (iy + gun.h/2) * PIXEL;
+          aaGuns.push(gun);
+        }
+      }
+    } else if (sceneType === 'labyrinth') {
+      // ПВО на земле
+      placeSimpleAA({ total: 10, omni: 6 }, { minTop: 4, maxTop: ROWS - 6, minWide: 3, spacing: 5 });
+      // ПВО внутри каждого помещения лабиринта
+      for (const spot of towerInteriorAASpots) {
+        const room = spot.room;
+        if (room.w < 6 || room.h < 4) continue;
         const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 5));
         const iy = room.y + room.h - 2;
         let free = true;
@@ -1054,7 +1196,7 @@
         const gun = spawnAA(top, x, type, { interior: true, allowNearPlayer: true });
         if (gun) { aaGuns.push(gun); extraPlaced++; }
       }
-    } else if (sceneType === 'desert') {
+    } else if (sceneType === 'desert' || sceneType === 'desert_adv') {
       placeSimpleAA(cfg, { minTop: 4, maxTop: ROWS - 6, minWide: 3, spacing: 8 });
       for (const spot of pyramidInteriorAASpots) {
         const room = spot.room;
@@ -1076,6 +1218,8 @@
           aaGuns.push(gun);
         }
       }
+    } else if (sceneType === 'glacier') {
+      placeSimpleAA(cfg, { minTop: 4, maxTop: ROWS - 6, minWide: 3, spacing: 8 });
     } else {
       placeSimpleAA(cfg, { minTop: 4, maxTop: ROWS - 6, minWide: 3, spacing: 7 });
     }
@@ -1090,23 +1234,31 @@
     caveCeilings = new Set();
     treeCrowns = new Set();
     pyramidCeilings = new Set();
+    towerCeilings = new Set();
     pyramidInteriorAASpots = [];
     pyramidInteriorTankSpots = [];
     fortressInteriorAASpots = [];
     fortressInteriorTankSpots = [];
+    towerInteriorAASpots = [];
+    towerInteriorTankSpots = [];
     const groundY = ROWS - 3;
 
     if (type === 'warehouse')      generateWarehouse(groundY);
     else if (type === 'mountains') generateMountains(groundY);
     else if (type === 'port')      generatePort(groundY);
-    else if (type === 'bridge')    generateBridge(groundY);
+    else if (type === 'bridge')    generateBridge(groundY, false);
+    else if (type === 'bridge_adv') generateBridge(groundY, true);
     else if (type === 'volcano')   generateVolcano(groundY);
-    else if (type === 'base')      generateBase(groundY);
+    else if (type === 'base')      generateBase(groundY, false);
+    else if (type === 'base_adv')  generateBase(groundY, true);
     else if (type === 'fortress')  generateFortress(groundY, false);
     else if (type === 'advfortress') generateFortress(groundY, true);
     else if (type === 'forest')    generateForest(groundY);
     else if (type === 'cave')      generateCave(groundY);
-    else if (type === 'desert')    generateDesert(groundY);
+    else if (type === 'desert')    generateDesert(groundY, false);
+    else if (type === 'desert_adv') generateDesert(groundY, true);
+    else if (type === 'glacier')   generateGlacier(groundY);
+    else if (type === 'labyrinth') generateLabyrinth(groundY);
 
     placeAAGuns();
     placeTanks();
@@ -1250,16 +1402,20 @@
   }
 
   // ============ МОСТ ============
-  function generateBridge(groundY) {
+  function generateBridge(groundY, upgraded) {
+    const mat = upgraded ? 6 : 3;
+    const bankMat = upgraded ? 6 : 3;
+
     for (let xx = 0; xx < COLS; xx++)
-      for (let yy = ROWS - 2; yy < ROWS; yy++) grid[yy][xx] = 3;
+      for (let yy = ROWS - 2; yy < ROWS; yy++) grid[yy][xx] = mat;
+
     for (let xx = 0; xx < 12; xx++) {
       const h = 8 + Math.floor(Math.random() * 4);
       const top = groundY - h;
       for (let yy = top; yy < ROWS; yy++) {
-        let s = 3;
-        if (yy === top) s = 1;
-        else if (yy < top + 2) s = 2;
+        let s = bankMat;
+        if (yy === top) s = upgraded ? 3 : 1;
+        else if (yy < top + 2) s = upgraded ? 6 : 2;
         grid[yy][xx] = s;
         bridgeStatic.add(keyOf(xx, yy));
       }
@@ -1268,36 +1424,59 @@
       const h = 8 + Math.floor(Math.random() * 4);
       const top = groundY - h;
       for (let yy = top; yy < ROWS; yy++) {
-        let s = 3;
-        if (yy === top) s = 1;
-        else if (yy < top + 2) s = 2;
+        let s = bankMat;
+        if (yy === top) s = upgraded ? 3 : 1;
+        else if (yy < top + 2) s = upgraded ? 6 : 2;
         grid[yy][xx] = s;
         bridgeStatic.add(keyOf(xx, yy));
       }
     }
     const bridgeY = groundY - 10;
-    const bridgeThickness = 2;
+    const bridgeThickness = upgraded ? 3 : 2;
     const leftBank = 11;
     const rightBank = COLS - 13;
     for (let xx = leftBank; xx <= rightBank; xx++) {
       for (let yy = bridgeY; yy < bridgeY + bridgeThickness; yy++) {
         if (xx < 0 || xx >= COLS || yy < 0 || yy >= ROWS) continue;
-        grid[yy][xx] = 3;
+        grid[yy][xx] = mat;
         bridgeStatic.add(keyOf(xx, yy));
       }
     }
-    const piers = [Math.floor(COLS * 0.3), Math.floor(COLS * 0.5), Math.floor(COLS * 0.7)];
+    const railingMat = upgraded ? 6 : 2;
+    for (let xx = leftBank; xx <= rightBank; xx += 2) {
+      const yy = bridgeY - 1;
+      if (xx < 0 || xx >= COLS || yy < 0) continue;
+      grid[yy][xx] = railingMat;
+      bridgeStatic.add(keyOf(xx, yy));
+    }
+    const piers = upgraded ? [Math.floor(COLS*0.2), Math.floor(COLS*0.4), Math.floor(COLS*0.5), Math.floor(COLS*0.6), Math.floor(COLS*0.8)]
+                           : [Math.floor(COLS * 0.3), Math.floor(COLS * 0.5), Math.floor(COLS * 0.7)];
     for (const px of piers) {
       for (let yy = bridgeY + bridgeThickness; yy < ROWS; yy++) {
-        grid[yy][px] = 3;
+        grid[yy][px] = mat;
         bridgeStatic.add(keyOf(px, yy));
-        if (px + 1 < COLS) { grid[yy][px + 1] = 3; bridgeStatic.add(keyOf(px + 1, yy)); }
+        if (px + 1 < COLS) { grid[yy][px + 1] = mat; bridgeStatic.add(keyOf(px + 1, yy)); }
       }
       for (let k = 1; k <= 4; k++) {
         const yy = bridgeY - k;
         if (yy < 0) break;
-        grid[yy][px] = 2;
+        grid[yy][px] = upgraded ? 6 : 2;
         bridgeStatic.add(keyOf(px, yy));
+      }
+    }
+
+    if (upgraded) {
+      for (let xx = 0; xx < 12; xx++) {
+        const top = groundY - 10;
+        for (let yy = top; yy < top + 3; yy++) {
+          if (xx >= 0 && xx < COLS && yy >= 0) grid[yy][xx] = 6;
+        }
+      }
+      for (let xx = COLS - 12; xx < COLS; xx++) {
+        const top = groundY - 10;
+        for (let yy = top; yy < top + 3; yy++) {
+          if (xx >= 0 && xx < COLS && yy >= 0) grid[yy][xx] = 6;
+        }
       }
     }
   }
@@ -1342,18 +1521,21 @@
   }
 
   // ============ ВОЕННАЯ БАЗА ============
-  function generateBase(groundY) {
+  function generateBase(groundY, upgraded) {
+    const groundMat = upgraded ? 6 : 3;
+    const wallMat = upgraded ? 6 : 3;
+
     for (let xx = 0; xx < COLS; xx++) {
-      for (let yy = groundY; yy < ROWS; yy++) grid[yy][xx] = 3;
-      grid[groundY][xx] = 1;
-      grid[groundY - 1][xx] = 2;
+      for (let yy = groundY; yy < ROWS; yy++) grid[yy][xx] = groundMat;
+      grid[groundY][xx] = upgraded ? 3 : 1;
+      grid[groundY - 1][xx] = upgraded ? 6 : 2;
     }
     const wallTop = groundY - 6;
     for (let xx = 4; xx < COLS - 4; xx++) {
       for (let yy = wallTop; yy < groundY; yy++) {
         if (xx > 20 && xx < 24) continue;
         if (xx > COLS - 24 && xx < COLS - 20) continue;
-        grid[yy][xx] = 3;
+        grid[yy][xx] = wallMat;
       }
     }
     const towers = [
@@ -1364,7 +1546,7 @@
       for (let xx = t.x; xx < t.x + 4; xx++)
         for (let yy = t.y; yy < groundY; yy++) {
           if (xx < 0 || xx >= COLS || yy < 0) continue;
-          grid[yy][xx] = 3;
+          grid[yy][xx] = wallMat;
         }
     }
     const hangars = [18, 38, COLS - 30];
@@ -1374,8 +1556,64 @@
       for (let xx = hx; xx < hx + hw; xx++)
         for (let yy = hy; yy < groundY; yy++) {
           if (xx < 0 || xx >= COLS) continue;
-          grid[yy][xx] = 3;
+          grid[yy][xx] = wallMat;
         }
+    }
+
+    if (upgraded) {
+      const cx = Math.floor(COLS / 2);
+      const bldW = 36;
+      const bldH = 22;
+      const bldTop = groundY - bldH;
+      const bldMat = 6;
+
+      for (let xx = cx - bldW/2; xx < cx + bldW/2; xx++) {
+        for (let yy = bldTop; yy < groundY; yy++) {
+          if (xx < 0 || xx >= COLS || yy < 0) continue;
+          const isOuter = (xx === Math.floor(cx - bldW/2) || xx === Math.floor(cx + bldW/2) - 1
+                           || yy === bldTop || yy === bldTop + 1);
+          if (isOuter) {
+            grid[yy][xx] = bldMat;
+            bridgeStatic.add(keyOf(xx, yy));
+          }
+        }
+      }
+
+      for (const colX of [cx - bldW/2 + 6, cx - 4, cx + 4, cx + bldW/2 - 7]) {
+        for (let yy = bldTop + 2; yy < groundY - 2; yy++) {
+          if (colX >= 0 && colX < COLS && yy >= 0) {
+            grid[yy][colX] = bldMat;
+            bridgeStatic.add(keyOf(colX, yy));
+          }
+        }
+      }
+
+      for (let xx = Math.floor(cx - bldW/2) + 1; xx < Math.floor(cx + bldW/2) - 1; xx++) {
+        const floorY = bldTop + 10;
+        if (floorY >= 0 && floorY < ROWS && xx >= 0 && xx < COLS) {
+          grid[floorY][xx] = bldMat;
+          bridgeStatic.add(keyOf(xx, floorY));
+        }
+      }
+
+      for (let y = bldTop + 3; y < groundY - 3; y += 4) {
+        for (let xx = Math.floor(cx - bldW/2) + 3; xx < Math.floor(cx + bldW/2) - 3; xx += 4) {
+          if (xx >= 0 && xx < COLS && y >= 0 && y < ROWS) {
+            grid[y][xx] = 3;
+          }
+        }
+      }
+
+      const doorX = cx;
+      const doorY = groundY - 1;
+      if (doorX >= 0 && doorX < COLS && doorY >= 0) {
+        grid[doorY][doorX] = 0;
+        grid[doorY - 1][doorX] = 0;
+        grid[doorY - 2][doorX] = 0;
+        grid[doorY][doorX + 1] = 0;
+        grid[doorY - 1][doorX + 1] = 0;
+        grid[doorY - 2][doorX + 1] = 0;
+      }
     }
   }
 
@@ -1597,14 +1835,19 @@
   }
 
   // ============ ПУСТЫНЯ ============
-  function generateDesert(groundY) {
+  function generateDesert(groundY, upgraded) {
+    const sandMat = upgraded ? 3 : 1;
+    const deepMat = upgraded ? 6 : 3;
+    const rockMat = upgraded ? 6 : 3;
+    const pyramidMat = upgraded ? 6 : 3;
+
     for (let xx = 0; xx < COLS; xx++) {
       const h = 4 + Math.sin(xx * 0.07) * 3 + Math.sin(xx * 0.19) * 2 + Math.sin(xx * 0.4) * 1;
       const top = Math.max(0, Math.round(groundY - h));
       for (let yy = top; yy < ROWS; yy++) {
-        let s = 1;
-        if (yy > top + 4) s = 3;
-        if (yy > top + 8) s = 3;
+        let s = sandMat;
+        if (yy > top + 4) s = deepMat;
+        if (yy > top + 8) s = deepMat;
         grid[yy][xx] = s;
       }
     }
@@ -1614,12 +1857,11 @@
       { cx: 80, peakY: ROWS - 26, baseY: ROWS - 6, halfBaseW: 11 },
       { cx: 130, peakY: ROWS - 34, baseY: ROWS - 6, halfBaseW: 16 }
     ];
-    const pyraMat = 3;
 
     for (let idx = 0; idx < pyramidDefs.length; idx++) {
       const p = pyramidDefs[idx];
       const baseBottom = p.baseY;
-      const profile = buildPyramid(p.cx, p.peakY, baseBottom, p.halfBaseW, pyraMat);
+      const profile = buildPyramid(p.cx, p.peakY, baseBottom, p.halfBaseW, pyramidMat);
 
       const rooms = [];
       const totalH = baseBottom - p.peakY;
@@ -1646,14 +1888,14 @@
         for (let yy = r.y; yy < r.y + r.h; yy++) {
           for (let xx = r.x; xx < r.x + r.w; xx++) {
             if (xx < 0 || xx >= COLS || yy < 0 || yy >= ROWS) continue;
-            if (grid[yy][xx] === pyraMat) grid[yy][xx] = 0;
+            if (grid[yy][xx] === pyramidMat) grid[yy][xx] = 0;
           }
         }
         const ceilY = r.y - 1;
         if (ceilY >= 0) {
           for (let xx = r.x - 1; xx <= r.x + r.w; xx++) {
             if (xx < 0 || xx >= COLS) continue;
-            grid[ceilY][xx] = pyraMat;
+            grid[ceilY][xx] = pyramidMat;
             pyramidCeilings.add(keyOf(xx, ceilY));
           }
         }
@@ -1667,14 +1909,14 @@
         for (let k = 0; k < shaftW; k++) {
           const xx = shaftX + k;
           if (xx < 0 || xx >= COLS || yy < 0 || yy >= ROWS) continue;
-          if (grid[yy][xx] === pyraMat) grid[yy][xx] = 0;
+          if (grid[yy][xx] === pyramidMat) grid[yy][xx] = 0;
         }
       }
       for (const r of rooms) {
         const midY = r.y + Math.floor(r.h / 2);
         for (let xx = Math.min(r.x, shaftX); xx <= Math.max(r.x + r.w, shaftX + shaftW); xx++) {
           if (xx < 0 || xx >= COLS || midY < 0 || midY >= ROWS) continue;
-          if (grid[midY][xx] === pyraMat) grid[midY][xx] = 0;
+          if (grid[midY][xx] === pyramidMat) grid[midY][xx] = 0;
         }
       }
 
@@ -1722,15 +1964,15 @@
       for (let xx = tx - 1; xx <= tx + 1; xx++) {
         if (xx < 0 || xx >= COLS) continue;
         for (let yy = groundTop - 2; yy < groundTop; yy++) {
-          grid[yy][xx] = 3;
+          grid[yy][xx] = rockMat;
         }
       }
       for (let yy = tTop; yy < groundTop - 2; yy++) {
         if (yy < 0) continue;
-        grid[yy][tx] = 2;
+        grid[yy][tx] = upgraded ? 6 : 2;
         if ((groundTop - yy) % 6 === 0) {
-          if (tx - 1 >= 0) grid[yy][tx - 1] = 2;
-          if (tx + 1 < COLS) grid[yy][tx + 1] = 2;
+          if (tx - 1 >= 0) grid[yy][tx - 1] = upgraded ? 6 : 2;
+          if (tx + 1 < COLS) grid[yy][tx + 1] = upgraded ? 6 : 2;
         }
       }
       if (tTop >= 0) grid[tTop][tx] = 1;
@@ -1750,7 +1992,7 @@
       for (let xx = bx; xx < bx + bw; xx++) {
         for (let yy = bTop; yy < groundTop; yy++) {
           if (xx < 0 || xx >= COLS) continue;
-          grid[yy][xx] = 3;
+          grid[yy][xx] = rockMat;
         }
       }
       const doorX = bx + Math.floor(bw / 2);
@@ -1766,7 +2008,7 @@
       }
       for (let xx = bx; xx < bx + bw; xx++) {
         if (xx >= 0 && xx < COLS && bTop >= 0) {
-          grid[bTop][xx] = 3;
+          grid[bTop][xx] = rockMat;
         }
       }
     }
@@ -1787,7 +2029,7 @@
         const hh = rockH - Math.floor(dx * 0.5);
         for (let k = 0; k < hh; k++) {
           const yy = groundTop - 1 - k;
-          if (yy >= 0) grid[yy][xx] = 3;
+          if (yy >= 0) grid[yy][xx] = rockMat;
         }
       }
     }
@@ -1802,10 +2044,201 @@
       if (groundTop < 4) continue;
       const cactusH = 4 + Math.floor(Math.random() * 3);
       for (let k = 1; k <= cactusH; k++) {
-        if (groundTop - k >= 0) grid[groundTop - k][cx2] = 1;
+        if (groundTop - k >= 0) grid[groundTop - k][cx2] = sandMat;
       }
-      if (groundTop - 2 >= 0 && cx2 - 1 >= 0) grid[groundTop - 2][cx2 - 1] = 1;
-      if (groundTop - 3 >= 0 && cx2 + 1 < COLS) grid[groundTop - 3][cx2 + 1] = 1;
+      if (groundTop - 2 >= 0 && cx2 - 1 >= 0) grid[groundTop - 2][cx2 - 1] = sandMat;
+      if (groundTop - 3 >= 0 && cx2 + 1 < COLS) grid[groundTop - 3][cx2 + 1] = sandMat;
+    }
+  }
+
+  // ============ ЛЕДНИК ============
+  function generateGlacier(groundY) {
+    const baseHeights = [];
+    for (let xx = 0; xx < COLS; xx++) {
+      const baseH = 18 + Math.sin(xx * 0.04) * 10 + Math.cos(xx * 0.11) * 6;
+      baseHeights[xx] = baseH;
+    }
+    for (let xx = 0; xx < COLS; xx++) {
+      const top = Math.max(2, Math.round(groundY - baseHeights[xx]));
+      for (let yy = top; yy < ROWS; yy++) {
+        let s = 2;
+        if (yy > top + 3) s = 3;
+        if (yy >= ROWS - 2) s = 3;
+        grid[yy][xx] = s;
+      }
+    }
+
+    for (let i = 0; i < 20; i++) {
+      const x = 5 + Math.floor(Math.random() * (COLS - 10));
+      let groundTop = findGroundTopInColumn(x);
+      if (groundTop < 6) continue;
+      const h = 2 + Math.floor(Math.random() * 4);
+      const w = 2 + Math.floor(Math.random() * 4);
+      for (let dx = 0; dx < w; dx++) {
+        const xx = x + dx;
+        if (xx < 0 || xx >= COLS) continue;
+        for (let k = 0; k < h; k++) {
+          const yy = groundTop - 1 - k;
+          if (yy >= 0) {
+            if (grid[yy][xx] === 0) grid[yy][xx] = 2;
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < 15; i++) {
+      const x = 8 + Math.floor(Math.random() * (COLS - 16));
+      let groundTop = findGroundTopInColumn(x);
+      if (groundTop < 8) continue;
+      const crackH = 3 + Math.floor(Math.random() * 4);
+      for (let k = 1; k <= crackH; k++) {
+        const yy = groundTop + k;
+        if (yy >= ROWS) break;
+        if (grid[yy] && grid[yy][x] === 2) grid[yy][x] = 0;
+      }
+    }
+
+    for (let i = 0; i < 10; i++) {
+      const x = 10 + Math.floor(Math.random() * (COLS - 20));
+      let groundTop = findGroundTopInColumn(x);
+      if (groundTop < 6) continue;
+      const h = 3 + Math.floor(Math.random() * 5);
+      for (let k = 0; k < h; k++) {
+        const yy = groundTop - 1 - k;
+        if (yy >= 0 && grid[yy][x] === 0) grid[yy][x] = 2;
+      }
+    }
+  }
+
+  // ============ ЛАБИРИНТ (в 3 раза шире бывшей Супер-башни) ============
+  function generateLabyrinth(groundY) {
+    const cx = Math.floor(COLS / 2);
+    const mat = 6;
+
+    // Плоское основание
+    for (let xx = 0; xx < COLS; xx++) {
+      for (let yy = groundY; yy < ROWS; yy++) grid[yy][xx] = 3;
+      grid[groundY][xx] = 2;
+      grid[groundY - 1][xx] = 2;
+    }
+
+    // ЛАБИРИНТ — в 3 раза шире (было 60, теперь 180, но экран всего 160 клеток,
+    // поэтому используем всю доступную ширину, оставляя небольшие отступы по 4 клетки)
+    const towerW = COLS - 8;   // почти на весь экран
+    const towerTop = 3;
+    const towerLeft = 4;
+    const towerRight = towerLeft + towerW;
+    const wallT = 3;            // толщина внешних стен
+
+    // Внешние стены
+    for (let yy = towerTop; yy < groundY; yy++) {
+      for (let xx = towerLeft; xx < towerRight; xx++) {
+        if (xx < 0 || xx >= COLS) continue;
+        const isLeftWall = xx < towerLeft + wallT;
+        const isRightWall = xx >= towerRight - wallT;
+        const isTop = yy < towerTop + wallT;
+        if (isLeftWall || isRightWall || isTop) grid[yy][xx] = mat;
+      }
+    }
+
+    const innerLeft = towerLeft + wallT;
+    const innerRight = towerRight - wallT;
+    const innerW = innerRight - innerLeft;
+
+    // Внутренние колонны-каркас (широкие, 2 клетки) — множество
+    const colPositions = [];
+    for (let xx = innerLeft + 8; xx < innerRight - 8; xx += 16) {
+      colPositions.push(xx);
+      for (let yy = towerTop + wallT; yy < groundY; yy++) {
+        if (xx < 0 || xx >= COLS) continue;
+        grid[yy][xx] = mat;
+        if (xx + 1 < COLS) grid[yy][xx + 1] = mat;
+      }
+    }
+
+    // Этажи (перекрытия толщиной 2)
+    const floorHeight = 14; // крупные этажи
+    const floors = [];
+    for (let fy = towerTop + wallT + floorHeight; fy < groundY - 6; fy += floorHeight) {
+      floors.push(fy);
+      for (let xx = innerLeft; xx < innerRight; xx++) {
+        if (xx < 0 || xx >= COLS) continue;
+        grid[fy][xx] = mat;
+        if (fy + 1 < ROWS) grid[fy + 1][xx] = mat;
+        towerCeilings.add(keyOf(xx, fy));
+        towerCeilings.add(keyOf(xx, fy + 1));
+      }
+    }
+
+    // Разбиваем этажи на комнаты (крупные)
+    for (let i = 0; i < floors.length - 1; i++) {
+      const fy = floors[i];
+      const nextFy = floors[i + 1];
+      const roomTop = fy + 2;
+      const roomBottom = nextFy;
+      const roomH = roomBottom - roomTop;
+      if (roomH < 6) continue;
+
+      // Стены-разделители — колонны каркаса + внешние
+      const walls = [innerLeft, ...colPositions.map(p => p + 2), innerRight];
+      for (let j = 0; j < walls.length - 1; j++) {
+        const roomLeft = walls[j] + 1;
+        const roomRight = walls[j + 1] - 1;
+        const roomW = roomRight - roomLeft + 1;
+        if (roomW < 8) continue;
+
+        // Вырезаем комнату
+        for (let ryy = roomTop; ryy < roomBottom; ryy++) {
+          for (let rxx = roomLeft; rxx <= roomRight; rxx++) {
+            if (rxx < 0 || rxx >= COLS || ryy < 0 || ryy >= ROWS) continue;
+            if (grid[ryy][rxx] === mat) grid[ryy][rxx] = 0;
+          }
+        }
+
+        // Регистрируем комнату для ПВО и танков
+        if (roomW >= 10 && roomH >= 6) {
+          const room = { x: roomLeft, y: roomTop, w: roomW, h: roomH };
+          // Зенитка
+          towerInteriorAASpots.push({
+            room,
+            type: Math.random() < 0.5 ? 'omni' : 'up'
+          });
+          // Танк (50% шанс)
+          if (Math.random() < 0.5) {
+            towerInteriorTankSpots.push(room);
+          }
+        }
+      }
+    }
+
+    // Вход в лабиринт (широкий)
+    const entranceX = cx;
+    if (entranceX >= 0 && entranceX < COLS) {
+      for (let k = 0; k < 5; k++) {
+        if (groundY - 1 - k >= 0) {
+          grid[groundY - 1 - k][entranceX] = 0;
+          grid[groundY - 1 - k][entranceX + 1] = 0;
+          grid[groundY - 1 - k][entranceX - 1] = 0;
+        }
+      }
+    }
+
+    // Крыша с антеннами
+    for (let xx = towerLeft; xx < towerRight; xx++) {
+      if (xx < 0 || xx >= COLS) continue;
+      if (towerTop - 1 >= 0) grid[towerTop - 1][xx] = mat;
+      if (towerTop - 2 >= 0) grid[towerTop - 2][xx] = mat;
+    }
+    // Много антенн по всей ширине
+    for (let ax = towerLeft + 6; ax < towerRight - 6; ax += 12) {
+      if (ax < 0 || ax >= COLS) continue;
+      for (let k = 1; k <= 5; k++) {
+        if (towerTop - 2 - k >= 0) {
+          grid[towerTop - 2 - k][ax] = 2;
+          towerCeilings.add(keyOf(ax, towerTop - 2 - k));
+        }
+      }
+      if (towerTop - 8 >= 0) grid[towerTop - 8][ax] = 1;
     }
   }
 
@@ -1825,11 +2258,20 @@
     ambientParticles = [];
     generateScene(sceneType);
 
-    const w = plane.id === 'plane' || plane.id === 'advplane' ? 52 : (plane.id === 'airship' || plane.id === 'advairship' ? 90 : 46);
-    const h = plane.id === 'plane' || plane.id === 'advplane' ? 14 : (plane.id === 'airship' || plane.id === 'advairship' ? 26 : 18);
+    rocketPhaseActive = !!plane.isRocketPlane;
+    rocketsRemaining = plane.isRocketPlane ? plane.rocketPhase : 0;
+    activeRocket = null;
+
+    const w = plane.id === 'plane' || plane.id === 'advplane' || plane.isRocketPlane ? 52 : (plane.id === 'airship' || plane.id === 'advairship' ? 90 : 46);
+    const h = plane.id === 'plane' || plane.id === 'advplane' || plane.isRocketPlane ? 14 : (plane.id === 'airship' || plane.id === 'advairship' ? 26 : 18);
+
+    let startY = 110;
+    if (plane.isRocketPlane && sceneType !== 'cave') {
+      startY = 60;
+    }
 
     helicopter = {
-      x: W / 2, y: 110,
+      x: W / 2, y: startY,
       vx: 0, vy: 0,
       w, h,
       rotor: 0, tilt: 0, cooldown: 0
@@ -1845,8 +2287,27 @@
     guidedRocket = null;
     aimMode = false;
     overlay.classList.remove('show');
+
     updateUI();
     fitCanvas();
+  }
+
+  function spawnPlayerRocket() {
+    if (rocketsRemaining <= 0) return;
+    const startX = helicopter.x;
+    const startY = helicopter.y + helicopter.h / 2 + 6;
+    const startAngle = Math.PI / 2;
+    activeRocket = {
+      x: startX,
+      y: startY,
+      angle: startAngle,
+      speed: 5.0,
+      trail: [],
+      life: 300,
+      exploded: false
+    };
+    rocketsRemaining--;
+    updateUI();
   }
 
   function updateUI() {
@@ -1855,7 +2316,19 @@
     totalEl.textContent = save.totalDestroyed;
     hangarTotalEl.textContent = save.totalDestroyed;
     livesEl.textContent = '❤'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, 3 - lives));
-    weaponEl.textContent = weaponLabel(currentWeapon);
+
+    if (rocketPhaseActive) {
+      rocketCounterEl.style.display = '';
+      rocketsLeftEl.textContent = rocketsRemaining;
+      if (activeRocket) {
+        weaponEl.textContent = '🚀 Управляй ракетой (← →)';
+      } else {
+        weaponEl.textContent = '🚀 ПРОБЕЛ — пуск ракеты';
+      }
+    } else {
+      rocketCounterEl.style.display = 'none';
+      weaponEl.textContent = weaponLabel(currentWeapon);
+    }
   }
 
   // ---------- Ввод ----------
@@ -1870,20 +2343,40 @@
     if (e.code === 'Escape' && mapsList.classList.contains('show')) { mapsList.classList.remove('show'); updatePauseState(); return; }
     if (e.code === 'KeyK') { addDestroyed(500); updateUI(); return; }
     keys[e.code] = true;
-    if (e.code === 'Space') { e.preventDefault(); primaryFire(); }
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (rocketPhaseActive) {
+        if (!activeRocket && rocketsRemaining > 0) {
+          spawnPlayerRocket();
+        }
+      } else {
+        primaryFire();
+      }
+    }
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyA','KeyD','KeyW','KeyS'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', e => { keys[e.code] = false; });
 
   canvas.addEventListener('mousedown', e => {
     if (hangarEl.classList.contains('show')) return;
-    if (e.button === 0) { e.preventDefault(); primaryFire(); }
-    else if (e.button === 2) { e.preventDefault(); secondaryFire(); }
+    if (e.button === 0) {
+      e.preventDefault();
+      if (rocketPhaseActive) return;
+      primaryFire();
+    }
+    else if (e.button === 2) {
+      e.preventDefault();
+      if (rocketPhaseActive) return;
+      secondaryFire();
+    }
   });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
   function primaryFire() {
     if (paused || gameOver || helicopter.cooldown > 0) return;
+    if (rocketPhaseActive) return;
+
     if (currentWeapon === 'rocket') {
       guidedRocket = {
         x: helicopter.x, y: helicopter.y + helicopter.h / 2 + 6,
@@ -1897,8 +2390,9 @@
       bombs.push({
         x: helicopter.x, y: helicopter.y + helicopter.h / 2 + 4,
         vx: helicopter.vx * 0.4, vy: 1.2,
-        r: plane.id === 'plane' || plane.id === 'advplane' ? 5 : 4,
-        weapon: currentWeapon, exploded: false
+        r: plane.id === 'plane' || plane.id === 'advplane' || plane.isRocketPlane ? 5 : 4,
+        weapon: currentWeapon, exploded: false,
+        rollCooldown: 0
       });
       helicopter.cooldown = plane.cooldownMax;
     }
@@ -1906,6 +2400,7 @@
 
   function secondaryFire() {
     if (paused || gameOver) return;
+    if (rocketPhaseActive) return;
     const list = getAvailableWeapons();
     if (list.length <= 1) return;
     if (currentWeapon === 'rocket' && guidedRocket && aimMode) {
@@ -1946,14 +2441,119 @@
     return { x: gx * PIXEL, y: gy * PIXEL };
   }
 
+  function tryRollBombOnIce(b) {
+    if (sceneType !== 'glacier') return;
+
+    const gx = Math.floor(b.x / PIXEL);
+    const gy = Math.floor(b.y / PIXEL);
+    if (gy < 0 || gy >= ROWS) return;
+
+    let surfaceY = -1;
+    for (let yy = gy; yy < Math.min(ROWS, gy + 4); yy++) {
+      if (grid[yy] && grid[yy][gx] > 0) { surfaceY = yy; break; }
+    }
+    if (surfaceY === -1 || surfaceY - gy > 2) return;
+
+    if (gy < surfaceY - 1) return;
+
+    let bestDx = 0;
+    let bestDelta = 0;
+
+    const topHere = surfaceY;
+    for (const dx of [-1, 1]) {
+      const nx = gx + dx;
+      if (nx < 0 || nx >= COLS) continue;
+      let topNext = ROWS;
+      for (let yy = Math.max(0, gy - 2); yy < ROWS; yy++) {
+        if (grid[yy] && grid[yy][nx] > 0) { topNext = yy; break; }
+      }
+      if (topNext === ROWS) continue;
+      const delta = topHere - topNext;
+      if (Math.abs(delta) > Math.abs(bestDelta)) {
+        bestDelta = delta;
+        bestDx = dx;
+      }
+    }
+
+    if (bestDx !== 0 && Math.abs(bestDelta) >= 1) {
+      const nx = gx + bestDx;
+      if (nx >= 0 && nx < COLS) {
+        const targetY = surfaceY - 1;
+        if (grid[targetY] && grid[targetY][nx] === 0) {
+          b.x = nx * PIXEL + PIXEL/2;
+          b.y = targetY * PIXEL + PIXEL/2;
+          b.vy = Math.min(b.vy, 1.5);
+          if (Math.random() < 0.3) {
+            particles.push({
+              x: b.x, y: b.y + 4,
+              vx: -bestDx * 0.5,
+              vy: -0.5,
+              life: 10,
+              color: '#b0e0f0'
+            });
+          }
+        }
+      }
+    }
+  }
+
   function update() {
     if (unlockToasts.length) {
       for (const t of unlockToasts) t.life--;
       unlockToasts = unlockToasts.filter(t => t.life > 0);
     }
-    // ПАУЗА — замираем, но продолжаем обновлять тосты
     if (paused) return;
     if (gameOver) return;
+
+    if (rocketPhaseActive) {
+      helicopter.vx = 0;
+      helicopter.vy = 0;
+      if (plane.tilt) helicopter.tilt *= 0.9;
+      helicopter.rotor += 1.4;
+
+      if (activeRocket && !activeRocket.exploded) {
+        const turnSpeed = 0.06;
+        if (keys['ArrowLeft'] || keys['KeyA'])  activeRocket.angle -= turnSpeed;
+        if (keys['ArrowRight'] || keys['KeyD']) activeRocket.angle += turnSpeed;
+
+        activeRocket.x += Math.cos(activeRocket.angle) * activeRocket.speed;
+        activeRocket.y += Math.sin(activeRocket.angle) * activeRocket.speed;
+        activeRocket.life--;
+
+        activeRocket.trail.push({ x: activeRocket.x, y: activeRocket.y, life: 14 });
+        if (activeRocket.trail.length > 22) activeRocket.trail.shift();
+        for (const t of activeRocket.trail) t.life--;
+
+        const gx = Math.floor(activeRocket.x / PIXEL);
+        const gy = Math.floor(activeRocket.y / PIXEL);
+        if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS ||
+            (grid[gy] && grid[gy][gx] > 0) ||
+            activeRocket.y > H || activeRocket.life <= 0) {
+          rocketExplodeAt(activeRocket.x, activeRocket.y);
+          activeRocket = null;
+          updateUI();
+        }
+      } else if (!activeRocket && rocketsRemaining === 0) {
+        endRocketPhase();
+        return;
+      }
+
+      for (const p of particles) {
+        p.vy += 0.15; p.x += p.vx; p.y += p.vy; p.life--;
+      }
+      particles = particles.filter(p => p.life > 0);
+
+      applyGravity();
+      updateUI();
+
+      if (!gameOver && countPixels() === 0 && aaGuns.length === 0 && tanks.length === 0) {
+        gameOver = true;
+        persist();
+        overlayTx.textContent = '🏆 ПОБЕДА!\nВсе пиксели, ПВО и танки уничтожены!';
+        overlay.classList.add('show');
+      }
+      return;
+    }
 
     const maxVx = plane.maxVx, maxVy = plane.maxVy;
     const acc = plane.accel, damp = plane.damping;
@@ -1978,12 +2578,17 @@
     if (plane.tilt) helicopter.tilt += (helicopter.vx * 0.06 - helicopter.tilt) * 0.15;
     else helicopter.tilt = 0;
 
-    helicopter.rotor += (plane.id === 'plane' || plane.id === 'advplane') ? 1.4 : 0.9;
+    helicopter.rotor += (plane.id === 'plane' || plane.id === 'advplane' || plane.isRocketPlane) ? 1.4 : 0.9;
     if (helicopter.cooldown > 0) helicopter.cooldown--;
 
     for (const b of bombs) {
       if (b.exploded) continue;
-      b.vy += 0.35; b.x += b.vx; b.y += b.vy;
+      b.vy += 0.35;
+      b.x += b.vx;
+      b.y += b.vy;
+
+      tryRollBombOnIce(b);
+
       const gx = Math.floor(b.x / PIXEL);
       const gy = Math.floor(b.y / PIXEL);
       if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS || (grid[gy] && grid[gy][gx] > 0) || b.y > H) {
@@ -2008,7 +2613,7 @@
         color: ['#ff8844','#ff4422','#ffaa33'][Math.floor(Math.random()*3)]
       });
     }
-    if (sceneType === 'desert' && Math.random() < 0.15) {
+    if ((sceneType === 'desert' || sceneType === 'desert_adv') && Math.random() < 0.15) {
       ambientParticles.push({
         x: Math.random() * W,
         y: (ROWS - 4) * PIXEL + Math.random() * 20,
@@ -2016,6 +2621,16 @@
         vy: -0.3 - Math.random() * 0.4,
         life: 100 + Math.random() * 60,
         color: ['#c9a45a','#d4b06a','#b8944a'][Math.floor(Math.random()*3)]
+      });
+    }
+    if (sceneType === 'glacier' && Math.random() < 0.2) {
+      ambientParticles.push({
+        x: Math.random() * W,
+        y: 20 + Math.random() * 100,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: 0.3 + Math.random() * 0.4,
+        life: 200 + Math.random() * 80,
+        color: ['#d0e8f0','#e0f0f8','#c0d8e8'][Math.floor(Math.random()*3)]
       });
     }
     for (const p of ambientParticles) {
@@ -2038,6 +2653,15 @@
       overlayTx.textContent = '🏆 ПОБЕДА!\nВсе пиксели, ПВО и танки уничтожены!';
       overlay.classList.add('show');
     }
+  }
+
+  function endRocketPhase() {
+    rocketPhaseActive = false;
+    activeRocket = null;
+    notifyToast('💣 Ракеты кончились! Теперь можно бомбить.');
+    if (helicopter.y < 90) helicopter.y = 110;
+    initCurrentWeaponForPlane();
+    updateUI();
   }
 
   function updateRockets() {
@@ -2115,6 +2739,106 @@
     if (destroyedCount > 0) addDestroyed(destroyedCount);
   }
 
+  function rocketExplodeAt(px, py) {
+    const R = 5, dmgCenter = 5, dmgEdge = 3;
+    const cxPix = Math.floor(px / PIXEL);
+    const cyPix = Math.floor(py / PIXEL);
+    let destroyedCount = 0;
+
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        if (dx*dx + dy*dy > R*R) continue;
+        const gx = cxPix + dx, gy = cyPix + dy;
+        if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) continue;
+        if (grid[gy][gx] > 0) {
+          const d = Math.sqrt(dx*dx + dy*dy);
+          const dmg = d < R * 0.5 ? dmgCenter : dmgEdge;
+          const before = grid[gy][gx];
+          grid[gy][gx] -= dmg;
+          if (grid[gy][gx] <= 0) { grid[gy][gx] = 0; destroyedCount++; }
+          if (Math.random() < 0.6) {
+            particles.push({
+              x: gx * PIXEL + PIXEL/2, y: gy * PIXEL + PIXEL/2,
+              vx: (Math.random() - 0.5) * 5, vy: -Math.random() * 4 - 1,
+              life: 20 + Math.random() * 20,
+              color: before === 1 ? '#c9a45a' : (before === 2 ? '#8a5a3a' : (before === 6 ? '#b44cff' : (before === 10 ? '#00e5ff' : '#6a6a7a')))
+            });
+          }
+        }
+      }
+    }
+
+    const radiusPx = R * PIXEL;
+    const aaToRemove = [];
+    for (const g of aaGuns) {
+      const d = Math.hypot(g.cx - px, g.cy - py);
+      if (d < radiusPx + PIXEL * 2) {
+        g.hp -= 3;
+        if (g.hp <= 0) {
+          aaToRemove.push(g);
+          for (let i = 0; i < 30; i++) {
+            const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 5;
+            particles.push({
+              x: g.cx, y: g.cy,
+              vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+              life: 25 + Math.random() * 20,
+              color: ['#ffd166','#ff8c42','#ff4d2e'][Math.floor(Math.random()*3)]
+            });
+          }
+        }
+      }
+    }
+    for (const g of aaToRemove) {
+      const idx = aaGuns.indexOf(g);
+      if (idx >= 0) aaGuns.splice(idx, 1);
+    }
+
+    const tankToRemove = [];
+    for (const t of tanks) {
+      const d = Math.hypot(t.cx - px, t.cy - py);
+      if (d < radiusPx + PIXEL * 3) {
+        t.hp -= 4;
+        for (let i = 0; i < 8; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3;
+          particles.push({
+            x: t.cx, y: t.cy,
+            vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+            life: 12,
+            color: '#ffaa33'
+          });
+        }
+        if (t.hp <= 0) {
+          tankToRemove.push(t);
+          for (let i = 0; i < 40; i++) {
+            const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 6;
+            particles.push({
+              x: t.cx, y: t.cy,
+              vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+              life: 25 + Math.random() * 25,
+              color: ['#ffd166','#ff8c42','#ff4d2e','#aa6622'][Math.floor(Math.random()*4)]
+            });
+          }
+        }
+      }
+    }
+    for (const t of tankToRemove) {
+      const idx = tanks.indexOf(t);
+      if (idx >= 0) tanks.splice(idx, 1);
+    }
+
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 6;
+      particles.push({
+        x: px, y: py,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+        life: 20 + Math.random() * 25,
+        color: ['#ffd166','#ff8c42','#ff4d2e','#fff3a0'][Math.floor(Math.random()*4)]
+      });
+    }
+
+    if (destroyedCount > 0) addDestroyed(destroyedCount);
+  }
+
   function updateAAGuns() {
     for (const g of aaGuns) {
       g.cooldown--;
@@ -2153,13 +2877,17 @@
   function updateAAProjectiles() {
     for (const p of aaProjectiles) {
       p.x += p.vx; p.y += p.vy; p.life--;
-      const hw = helicopter.w / 2;
-      const hh = helicopter.h / 2;
-      if (Math.abs(p.x - helicopter.x) < (hw + p.r) && Math.abs(p.y - helicopter.y) < hh) {
-        p.life = 0;
-        onPlayerHit();
-        continue;
+
+      if (!rocketPhaseActive) {
+        const hw = helicopter.w / 2;
+        const hh = helicopter.h / 2;
+        if (Math.abs(p.x - helicopter.x) < (hw + p.r) && Math.abs(p.y - helicopter.y) < hh) {
+          p.life = 0;
+          onPlayerHit();
+          continue;
+        }
       }
+
       const gx = Math.floor(p.x / PIXEL);
       const gy = Math.floor(p.y / PIXEL);
       if (gy < 0 || gx < 0 || gx >= COLS || (gy >= 0 && gy < ROWS && grid[gy] && grid[gy][gx] > 0) || p.life <= 0) {
@@ -2355,7 +3083,7 @@
 
     if (destroyedCount > 0) addDestroyed(destroyedCount);
 
-    const sparkCount = (plane.id === 'plane' || plane.id === 'advplane') ? 32 : 26;
+    const sparkCount = (plane.id === 'plane' || plane.id === 'advplane' || plane.isRocketPlane) ? 32 : 26;
     for (let i = 0; i < sparkCount; i++) {
       const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 5;
       particles.push({
@@ -2389,6 +3117,7 @@
         if (caveCeilings.has(keyOf(x, y))) continue;
         if (treeCrowns.has(keyOf(x, y))) continue;
         if (pyramidCeilings.has(keyOf(x, y))) continue;
+        if (towerCeilings.has(keyOf(x, y))) continue;
         const supports = countSupportsBelow(x, y);
         if (supports < 3) {
           if (y + 1 < ROWS && grid[y + 1][x] === 0) {
@@ -2458,13 +3187,18 @@
     else if (sceneType === 'warehouse') { top = '#0f0f14'; bottom = '#2a2a30'; }
     else if (sceneType === 'port') { top = '#0a1e3a'; bottom = '#1e3a52'; }
     else if (sceneType === 'bridge')  { top = '#0a1e3a'; bottom = '#2a4a6a'; }
+    else if (sceneType === 'bridge_adv')  { top = '#051528'; bottom = '#153050'; }
     else if (sceneType === 'volcano') { top = '#1a0a0a'; bottom = '#3a1208'; }
     else if (sceneType === 'base')    { top = '#0a1a10'; bottom = '#1a2a1a'; }
+    else if (sceneType === 'base_adv')    { top = '#051a08'; bottom = '#0a2a10'; }
     else if (sceneType === 'fortress') { top = '#14081e'; bottom = '#2a1040'; }
     else if (sceneType === 'advfortress') { top = '#061822'; bottom = '#0a3040'; }
     else if (sceneType === 'forest')  { top = '#0a1a10'; bottom = '#1a3520'; }
     else if (sceneType === 'cave')    { top = '#0a0510'; bottom = '#1a0f20'; }
     else if (sceneType === 'desert')  { top = '#2a1a08'; bottom = '#5a3a18'; }
+    else if (sceneType === 'desert_adv')  { top = '#3a2008'; bottom = '#6a4018'; }
+    else if (sceneType === 'glacier')  { top = '#0a1830'; bottom = '#a0d0e8'; }
+    else if (sceneType === 'labyrinth')  { top = '#051520'; bottom = '#0a2030'; }
     else { top = '#0a1a2a'; bottom = '#1e3a52'; }
 
     const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -2473,7 +3207,7 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
-    if (sceneType !== 'desert') {
+    if (sceneType !== 'desert' && sceneType !== 'desert_adv') {
       for (const s of stars) {
         ctx.globalAlpha = s.a;
         ctx.fillStyle = '#ffffff';
@@ -2481,26 +3215,37 @@
       }
       ctx.globalAlpha = 1;
 
-      ctx.fillStyle = 'rgba(255,240,200,0.9)';
-      ctx.beginPath();
-      ctx.arc(W - 90, 80, 26, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(200,210,255,0.15)';
-      ctx.beginPath();
-      ctx.arc(W - 90, 80, 40, 0, Math.PI * 2);
-      ctx.fill();
+      if (sceneType !== 'glacier') {
+        ctx.fillStyle = 'rgba(255,240,200,0.9)';
+        ctx.beginPath();
+        ctx.arc(W - 90, 80, 26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(200,210,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(W - 90, 80, 40, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = 'rgba(150, 255, 200, 0.12)';
+        ctx.beginPath();
+        ctx.ellipse(W * 0.3, 80, 200, 50, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.10)';
+        ctx.beginPath();
+        ctx.ellipse(W * 0.7, 100, 250, 60, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else {
-      ctx.fillStyle = 'rgba(255, 220, 120, 0.9)';
+      ctx.fillStyle = sceneType === 'desert_adv' ? 'rgba(255, 200, 100, 0.95)' : 'rgba(255, 220, 120, 0.9)';
       ctx.beginPath();
-      ctx.arc(W - 90, 70, 34, 0, Math.PI * 2);
+      ctx.arc(W - 90, 70, sceneType === 'desert_adv' ? 40 : 34, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255, 200, 100, 0.25)';
+      ctx.fillStyle = sceneType === 'desert_adv' ? 'rgba(255, 170, 80, 0.3)' : 'rgba(255, 200, 100, 0.25)';
       ctx.beginPath();
-      ctx.arc(W - 90, 70, 60, 0, Math.PI * 2);
+      ctx.arc(W - 90, 70, sceneType === 'desert_adv' ? 70 : 60, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    if (sceneType === 'bridge' || sceneType === 'port') {
+    if (sceneType === 'bridge' || sceneType === 'bridge_adv' || sceneType === 'port') {
       const waterY = H - 30;
       const waterColor = sceneType === 'port' ? 'rgba(15, 55, 95, 0.9)' : 'rgba(20, 60, 100, 0.85)';
       ctx.fillStyle = waterColor;
@@ -2541,11 +3286,25 @@
       ctx.fillStyle = v;
       ctx.fillRect(0, 0, W, H);
     }
-    if (sceneType === 'desert') {
+    if (sceneType === 'desert' || sceneType === 'desert_adv') {
       const heat = ctx.createLinearGradient(0, H - 200, 0, H);
       heat.addColorStop(0, 'rgba(255, 180, 80, 0)');
-      heat.addColorStop(1, 'rgba(255, 180, 80, 0.15)');
+      heat.addColorStop(1, sceneType === 'desert_adv' ? 'rgba(255, 160, 60, 0.25)' : 'rgba(255, 180, 80, 0.15)');
       ctx.fillStyle = heat;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (sceneType === 'glacier') {
+      const cold = ctx.createLinearGradient(0, H - 200, 0, H);
+      cold.addColorStop(0, 'rgba(180, 220, 240, 0)');
+      cold.addColorStop(1, 'rgba(180, 220, 240, 0.15)');
+      ctx.fillStyle = cold;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (sceneType === 'labyrinth') {
+      const glow = ctx.createRadialGradient(W/2, H/2, 40, W/2, H/2, 600);
+      glow.addColorStop(0, 'rgba(100, 150, 200, 0.15)');
+      glow.addColorStop(1, 'rgba(100, 150, 200, 0)');
+      ctx.fillStyle = glow;
       ctx.fillRect(0, 0, W, H);
     }
   }
@@ -2564,6 +3323,9 @@
     } else if (sceneType === 'base') {
       colors = { 1: '#7a8a6a', 2: '#5a6a5a', 3: '#4a4a3a' };
       colorsDark = { 1: '#4a5a3a', 2: '#3a4a3a', 3: '#2a2a1a' };
+    } else if (sceneType === 'base_adv') {
+      colors = { 1: '#7a8a6a', 2: '#5a6a5a', 3: '#4a4a3a', 6: '#7a8acf' };
+      colorsDark = { 1: '#4a5a3a', 2: '#3a4a3a', 3: '#2a2a1a', 6: '#3a4a8a' };
     } else if (sceneType === 'warehouse') {
       colors = { 1: '#8a8a8a', 2: '#6a6a7a', 3: '#4a4a5a' };
       colorsDark = { 1: '#5a5a5a', 2: '#3a3a4a', 3: '#2a2a3a' };
@@ -2573,6 +3335,9 @@
     } else if (sceneType === 'bridge') {
       colors = { 1: '#a0a0a0', 2: '#6a5a4a', 3: '#4a4a5a' };
       colorsDark = { 1: '#606060', 2: '#3a2a1a', 3: '#2a2a3a' };
+    } else if (sceneType === 'bridge_adv') {
+      colors = { 1: '#a0a0a0', 2: '#6a5a4a', 3: '#4a4a5a', 6: '#c0a0e0' };
+      colorsDark = { 1: '#606060', 2: '#3a2a1a', 3: '#2a2a3a', 6: '#6a3a8a' };
     } else if (sceneType === 'forest') {
       colors = { 1: '#4caf50', 2: '#6a4a2a', 3: '#5a5a5a' };
       colorsDark = { 1: '#2a7a2a', 2: '#3a2a10', 3: '#2a2a2a' };
@@ -2582,6 +3347,15 @@
     } else if (sceneType === 'desert') {
       colors = { 1: '#d4b06a', 2: '#b8956a', 3: '#a0855a' };
       colorsDark = { 1: '#a4853a', 2: '#8a6540', 3: '#6a5530' };
+    } else if (sceneType === 'desert_adv') {
+      colors = { 1: '#d4b06a', 2: '#b8956a', 3: '#a0855a', 6: '#ffaa44' };
+      colorsDark = { 1: '#a4853a', 2: '#8a6540', 3: '#6a5530', 6: '#aa6010' };
+    } else if (sceneType === 'glacier') {
+      colors = { 1: '#b0e0f0', 2: '#90c8e0', 3: '#5070a0' };
+      colorsDark = { 1: '#80b0c8', 2: '#6090b0', 3: '#304870' };
+    } else if (sceneType === 'labyrinth') {
+      colors = { 1: '#c9a45a', 2: '#8a5a3a', 3: '#5a5a7a', 6: '#8a8af0' };
+      colorsDark = { 1: '#8a6f3a', 2: '#5a3a24', 3: '#3a3a5a', 6: '#4a4a9a' };
     } else {
       colors = { 1: '#c9a45a', 2: '#8a5a3a', 3: '#6a6a7a' };
       colorsDark = { 1: '#8a6f3a', 2: '#5a3a24', 3: '#44445a' };
@@ -2593,10 +3367,13 @@
         if (!v) continue;
         const px = x * PIXEL, py = y * PIXEL;
 
-        if ((sceneType === 'fortress' || sceneType === 'advfortress') && (v === 6 || v === 10)) {
+        if ((sceneType === 'fortress' || sceneType === 'advfortress' || sceneType === 'labyrinth') && (v === 6 || v === 10)) {
           const layerIndex = Math.floor(y / 9) % 2;
           let baseColor, darkColor;
-          if (v === 6) {
+          if (sceneType === 'labyrinth') {
+            baseColor = layerIndex === 0 ? '#8a8af0' : '#6a6adf';
+            darkColor = layerIndex === 0 ? '#4a4a9a' : '#3a3a7a';
+          } else if (v === 6) {
             baseColor = layerIndex === 0 ? '#b44cff' : '#9a3adf';
             darkColor = layerIndex === 0 ? '#6a1a9a' : '#4a0a7a';
           } else {
@@ -2609,7 +3386,7 @@
           ctx.fillRect(px, py + PIXEL - 1, PIXEL, 1);
           ctx.fillRect(px + PIXEL - 1, py, 1, PIXEL);
           if ((x * 7 + y * 13) % 11 === 0) {
-            ctx.fillStyle = v === 10 ? 'rgba(220, 255, 255, 0.4)' : 'rgba(255, 200, 255, 0.25)';
+            ctx.fillStyle = 'rgba(220, 240, 255, 0.4)';
             ctx.fillRect(px + 1, py + 1, 2, 1);
           }
         } else {
@@ -2618,9 +3395,15 @@
           ctx.fillStyle = colorsDark[v] || '#444';
           ctx.fillRect(px, py + PIXEL - 1, PIXEL, 1);
           ctx.fillRect(px + PIXEL - 1, py, 1, PIXEL);
+          if (sceneType === 'glacier' && v === 2) {
+            if ((x * 5 + y * 7) % 6 === 0) {
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+              ctx.fillRect(px + 1, py + 1, 2, 1);
+            }
+          }
         }
 
-        if ((sceneType === 'bridge' || sceneType === 'port') && bridgeStatic.has(keyOf(x, y))) {
+        if ((sceneType === 'bridge' || sceneType === 'bridge_adv' || sceneType === 'port') && bridgeStatic.has(keyOf(x, y))) {
           ctx.fillStyle = 'rgba(180, 190, 210, 0.15)';
           ctx.fillRect(px + 1, py + 1, PIXEL - 2, 1);
         }
@@ -2636,8 +3419,16 @@
           ctx.fillStyle = 'rgba(180, 255, 180, 0.2)';
           ctx.fillRect(px + 1, py + 1, PIXEL - 2, 1);
         }
-        if (sceneType === 'desert' && pyramidCeilings.has(keyOf(x, y))) {
+        if ((sceneType === 'desert' || sceneType === 'desert_adv') && pyramidCeilings.has(keyOf(x, y))) {
           ctx.fillStyle = 'rgba(255, 220, 150, 0.3)';
+          ctx.fillRect(px + 1, py + 1, PIXEL - 2, 1);
+        }
+        if (sceneType === 'base_adv' && bridgeStatic.has(keyOf(x, y))) {
+          ctx.fillStyle = 'rgba(140, 180, 255, 0.25)';
+          ctx.fillRect(px + 1, py + 1, PIXEL - 2, 1);
+        }
+        if (sceneType === 'labyrinth' && towerCeilings.has(keyOf(x, y))) {
+          ctx.fillStyle = 'rgba(180, 200, 255, 0.35)';
           ctx.fillRect(px + 1, py + 1, PIXEL - 2, 1);
         }
         if (sceneType === 'volcano' && v === 1) {
@@ -2781,6 +3572,48 @@
     }
   }
 
+  function drawActiveRocket() {
+    if (!activeRocket || activeRocket.exploded) return;
+    for (const t of activeRocket.trail) {
+      const a = Math.max(0, t.life / 14);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#ff8844';
+      ctx.fillRect(t.x - 1.5, t.y - 1.5, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.save();
+    ctx.translate(activeRocket.x, activeRocket.y);
+    ctx.rotate(activeRocket.angle);
+    ctx.fillStyle = '#ffb366';
+    ctx.fillRect(-10, -3, 18, 6);
+    ctx.fillStyle = '#ff2222';
+    ctx.beginPath();
+    ctx.moveTo(8, -4);
+    ctx.lineTo(14, 0);
+    ctx.lineTo(8, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffee44';
+    ctx.fillRect(-14, -2, 4, 4);
+    ctx.fillStyle = '#ff6622';
+    ctx.fillRect(-16, -1, 3, 2);
+    ctx.restore();
+
+    const aheadX = activeRocket.x + Math.cos(activeRocket.angle) * 24;
+    const aheadY = activeRocket.y + Math.sin(activeRocket.angle) * 24;
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(activeRocket.x + Math.cos(activeRocket.angle) * 14, activeRocket.y + Math.sin(activeRocket.angle) * 14);
+    ctx.lineTo(aheadX, aheadY);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+    ctx.beginPath();
+    ctx.arc(aheadX, aheadY, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   function drawAim() {
     if (!aimMode || !guidedRocket) return;
     const t = pickTargetForGuided();
@@ -2804,7 +3637,7 @@
     c.translate(cx, cy);
     if (tilt !== undefined && pl.tilt !== false) c.rotate(tilt);
 
-    if (pl.id === 'plane' || pl.id === 'advplane') {
+    if (pl.id === 'plane' || pl.id === 'advplane' || pl.isRocketPlane) {
       c.fillStyle = pl.color2; c.fillRect(-26, -3, 52, 6);
       c.fillStyle = pl.color1; c.fillRect(-22, -5, 44, 10);
       c.fillStyle = pl.color2; c.fillRect(-6, -12, 12, 24);
@@ -2813,6 +3646,16 @@
       c.strokeStyle = 'rgba(220,230,255,0.6)'; c.lineWidth = 2;
       const off = Math.sin(rotor) * 8;
       c.beginPath(); c.moveTo(26, off); c.lineTo(26, -off); c.stroke();
+      if (pl.isRocketPlane) {
+        c.fillStyle = '#ff4444';
+        c.fillRect(-18, 6, 4, 2);
+        c.fillRect(-10, 6, 4, 2);
+        c.fillRect(2, 6, 4, 2);
+        if (pl.rocketPhase >= 5) {
+          c.fillRect(10, 6, 4, 2);
+          c.fillRect(18, 6, 4, 2);
+        }
+      }
     } else if (pl.id === 'airship' || pl.id === 'advairship') {
       c.fillStyle = pl.color2;
       c.beginPath(); c.ellipse(0, 0, 44, 16, 0, 0, Math.PI * 2); c.fill();
@@ -2870,6 +3713,28 @@
       ctx.ellipse(helicopter.x, shadowY + 3, 50, 6, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (rocketPhaseActive) {
+      ctx.save();
+      ctx.globalAlpha = 0.3 + 0.2 * Math.sin(Date.now() * 0.01);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(helicopter.x, helicopter.y, 32, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      if (activeRocket && !activeRocket.exploded) {
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = '#ff8844';
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(helicopter.x, helicopter.y);
+        ctx.lineTo(activeRocket.x, activeRocket.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     drawBomber(ctx, helicopter.x, helicopter.y, plane, helicopter.rotor, helicopter.tilt);
   }
 
@@ -2910,7 +3775,7 @@
       ctx.font = 'bold 18px "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
-      ctx.fillRect(W/2 - 340, y - 22, 680, 30);
+      ctx.fillRect(W/2 - 380, y - 22, 760, 30);
       ctx.fillStyle = '#ffd166';
       ctx.fillText(t.text, W/2, y);
       ctx.globalAlpha = 1;
@@ -2942,6 +3807,7 @@
     drawAAGuns();
     drawBombs();
     drawRockets();
+    drawActiveRocket();
     drawAAProjectiles();
     drawHelicopter();
     drawAim();
@@ -2970,7 +3836,7 @@
 
   function buildHangarCards() {
     planesEl.innerHTML = '';
-    for (const id of ['basic','advanced','plane','advplane','airship','advairship']) {
+    for (const id of ['basic','advanced','plane','advplane','airship','advairship','rocketplane','advrocketplane']) {
       const pl = PLANES[id];
       const card = document.createElement('div');
       card.className = 'plane-card';
@@ -3016,9 +3882,7 @@
     save.selected = id;
     persist();
     notifyToast('✅ Выбрано: ' + PLANES[id].name);
-    // initGame пересоздаёт раунд — ангар остаётся открытым, пауза сохраняется
     initGame();
-    // но обновим паузу на случай, если ангар всё ещё открыт
     updatePauseState();
     refreshHangarCards();
   }
@@ -3036,6 +3900,10 @@
       hint = `До «Дирижабля»: ${Math.max(0, PLANES.airship.req - save.totalDestroyed)}`;
     } else if (!save.unlocked.advairship) {
       hint = `До «Улучшенного дирижабля»: ${Math.max(0, PLANES.advairship.req - save.totalDestroyed)}`;
+    } else if (!save.unlocked.rocketplane) {
+      hint = `До «Ракетного самолёта»: ${Math.max(0, PLANES.rocketplane.req - save.totalDestroyed)}`;
+    } else if (!save.unlocked.advrocketplane) {
+      hint = `До «Улучшенного ракетного самолёта»: ${Math.max(0, PLANES.advrocketplane.req - save.totalDestroyed)}`;
     } else {
       hint = 'Все бомбардировщики разблокированы!';
     }
